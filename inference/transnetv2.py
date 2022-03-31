@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import tensorflow as tf
-
+import pdb
 
 class TransNetV2:
 
@@ -41,12 +41,16 @@ class TransNetV2:
             # the first and last window must be padded by copies of the first and last frame of the video
             no_padded_frames_start = 25
             no_padded_frames_end = 25 + 50 - (len(frames) % 50 if len(frames) % 50 != 0 else 50)  # 25 - 74
+            # len(frames) -- 14541 ==> len(frames) % 50 --- 41
+            # ==> no_padded_frames_end -- 34
 
-            start_frame = np.expand_dims(frames[0], 0)
+            start_frame = np.expand_dims(frames[0], 0) # frames[0].shape -- (27, 48, 3)
+            # ==> np.expand_dims(frames[0], 0).shape -- (1, 27, 48, 3)
             end_frame = np.expand_dims(frames[-1], 0)
             padded_inputs = np.concatenate(
                 [start_frame] * no_padded_frames_start + [frames] + [end_frame] * no_padded_frames_end, 0
             )
+            # ==> padded_inputs.shape -- (14600, 27, 48, 3)
 
             ptr = 0
             while ptr + 100 <= len(padded_inputs):
@@ -55,11 +59,15 @@ class TransNetV2:
                 yield out[np.newaxis]
 
         predictions = []
-
         for inp in input_iterator():
+            #  inp.shape -- (1, 100, 27, 48, 3)
             single_frame_pred, all_frames_pred = self.predict_raw(inp)
             predictions.append((single_frame_pred.numpy()[0, 25:75, 0],
                                 all_frames_pred.numpy()[0, 25:75, 0]))
+            # single_frame_pred.numpy().shape -- (1, 100, 1)
+            # single_frame_pred.numpy()[0, 25:75, 0].shape -- (50,)
+            # type(predictions[0]) -- <class 'tuple'>
+            # (Pdb) type(predictions[0][0]) -- <class 'numpy.ndarray'>
 
             print("\r[TransNetV2] Processing video frames {}/{}".format(
                 min(len(predictions) * 50, len(frames)), len(frames)
@@ -85,6 +93,8 @@ class TransNetV2:
         ).run(capture_stdout=True, capture_stderr=True)
 
         video = np.frombuffer(video_stream, np.uint8).reshape([-1, 27, 48, 3])
+        # video.shape -- (14541, 27, 48, 3)
+        #  video.min(), video.max() -- (0, 255)
         return (video, *self.predict_frames(video))
 
     @staticmethod
@@ -164,10 +174,10 @@ def main():
 
     model = TransNetV2(args.weights)
     for file in args.files:
-        if os.path.exists(file + ".predictions.txt") or os.path.exists(file + ".scenes.txt"):
-            print(f"[TransNetV2] {file}.predictions.txt or {file}.scenes.txt already exists. "
-                  f"Skipping video {file}.", file=sys.stderr)
-            continue
+        # if os.path.exists(file + ".predictions.txt") or os.path.exists(file + ".scenes.txt"):
+        #     print(f"[TransNetV2] {file}.predictions.txt or {file}.scenes.txt already exists. "
+        #           f"Skipping video {file}.", file=sys.stderr)
+        #     continue
 
         video_frames, single_frame_predictions, all_frame_predictions = \
             model.predict_video(file)

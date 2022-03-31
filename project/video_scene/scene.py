@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as functional
+import torch.nn.functional as F
+from typing import List
 
 import random
 import pdb
 
 class TransNetV2(nn.Module):
-
     def __init__(self,
                  F=16, L=3, S=2, D=1024,
                  use_many_hot_targets=True,
@@ -74,7 +74,7 @@ class TransNetV2(nn.Module):
             x = torch.cat([self.color_hist_layer(inputs), x], 2)
 
         x = self.fc1(x)
-        x = functional.relu(x)
+        x = F.relu(x)
 
         if self.dropout is not None:
             x = self.dropout(x)
@@ -109,7 +109,7 @@ class StackedDDCNNV2(nn.Module):
         self.shortcut = shortcut
         self.DDCNN = nn.ModuleList([
             DilatedDCNNV2(in_filters if i == 1 else filters * 4, filters, octave_conv=use_octave_conv,
-                          activation=functional.relu if i != n_blocks else None) for i in range(1, n_blocks + 1)
+                          activation=F.relu if i != n_blocks else None) for i in range(1, n_blocks + 1)
         ])
         self.pool = nn.MaxPool3d(kernel_size=(1, 2, 2)) if pool_type == "max" else nn.AvgPool3d(kernel_size=(1, 2, 2))
         self.stochastic_depth_drop_prob = stochastic_depth_drop_prob
@@ -123,7 +123,7 @@ class StackedDDCNNV2(nn.Module):
             if shortcut is None:
                 shortcut = x
 
-        x = functional.relu(x)
+        x = F.relu(x)
 
         if self.shortcut is not None:
             if self.stochastic_depth_drop_prob != 0.:
@@ -244,11 +244,11 @@ class FrameSimilarity(nn.Module):
         x = torch.transpose(x, 1, 2)
 
         x = self.projection(x)
-        x = functional.normalize(x, p=2, dim=2)
+        x = F.normalize(x, p=2, dim=2)
 
         batch_size, time_window = x.shape[0], x.shape[1]
         similarities = torch.bmm(x, x.transpose(1, 2))  # [batch_size, time_window, time_window]
-        similarities_padded = functional.pad(similarities, [(self.lookup_window - 1) // 2, (self.lookup_window - 1) // 2])
+        similarities_padded = F.pad(similarities, [(self.lookup_window - 1) // 2, (self.lookup_window - 1) // 2])
 
         batch_indices = torch.arange(0, batch_size, device=x.device).view([batch_size, 1, 1]).repeat(
             [1, time_window, self.lookup_window])
@@ -258,7 +258,7 @@ class FrameSimilarity(nn.Module):
             [batch_size, time_window, 1]) + time_indices
 
         similarities = similarities_padded[batch_indices, time_indices, lookup_indices]
-        return functional.relu(self.fc(similarities))
+        return F.relu(self.fc(similarities))
 
 
 class ColorHistograms(nn.Module):
@@ -294,7 +294,7 @@ class ColorHistograms(nn.Module):
         histograms.scatter_add_(0, binned_values, torch.ones(len(binned_values), dtype=torch.int32, device=frames.device))
 
         histograms = histograms.view(batch_size, time_window, 512).float()
-        histograms_normalized = functional.normalize(histograms, p=2, dim=2)
+        histograms_normalized = F.normalize(histograms, p=2, dim=2)
         return histograms_normalized
 
     def forward(self, inputs):
@@ -302,7 +302,7 @@ class ColorHistograms(nn.Module):
 
         batch_size, time_window = x.shape[0], x.shape[1]
         similarities = torch.bmm(x, x.transpose(1, 2))  # [batch_size, time_window, time_window]
-        similarities_padded = functional.pad(similarities, [(self.lookup_window - 1) // 2, (self.lookup_window - 1) // 2])
+        similarities_padded = F.pad(similarities, [(self.lookup_window - 1) // 2, (self.lookup_window - 1) // 2])
 
         batch_indices = torch.arange(0, batch_size, device=x.device).view([batch_size, 1, 1]).repeat(
             [1, time_window, self.lookup_window])
@@ -314,31 +314,5 @@ class ColorHistograms(nn.Module):
         similarities = similarities_padded[batch_indices, time_indices, lookup_indices]
 
         if self.fc is not None:
-            return functional.relu(self.fc(similarities))
+            return F.relu(self.fc(similarities))
         return similarities
-
-
-if __name__ == "__main__":
-    model = TransNetV2()
-    state_dict = torch.load("transnetv2-pytorch-weights.pth")
-    model.load_state_dict(state_dict)
-    model.eval().cuda()
-
-    # model = torch.jit.script(model)
-
-    print(model)
-
-    with torch.no_grad():
-        # shape: batch dim x video frames x frame height x frame width x RGB (not BGR) channels
-        input_video = torch.zeros(1, 100, 27, 48, 3, dtype=torch.uint8)
-        single_frame_pred, all_frame_pred = model(input_video.cuda())
-        
-        single_frame_pred = torch.sigmoid(single_frame_pred).cpu().numpy()
-        all_frame_pred = torch.sigmoid(all_frame_pred["many_hot"]).cpu().numpy()
-
-    # (Pdb) input_video.size() -- [1, 100, 27, 48, 3]
-    # (Pdb) single_frame_pred.shape -- (1, 100, 1)
-    # (Pdb) all_frame_pred.shape -- (1, 100, 1)
-
-
-    pdb.set_trace()
