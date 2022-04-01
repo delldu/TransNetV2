@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
+
 plt.switch_backend("agg")
 
 
@@ -110,7 +111,7 @@ def graph(data, labels=None, marker=""):
 
     plots = []
     for x, y in data:
-        p, = plt.plot(x, y, marker=marker)
+        (p,) = plt.plot(x, y, marker=marker)
         plots.append(p)
 
     # plt.legend(plots, legends)
@@ -138,18 +139,19 @@ def graph(data, labels=None, marker=""):
 
 
 def create_scene_based_summaries(one_hot_pred, one_hot_gt, prefix="test", step=0):
-    thresholds = np.array([
-        0.02, 0.06, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9
-    ])
-    precision, recall, f1, tp, fp, fn = np.zeros_like(thresholds), np.zeros_like(thresholds),\
-                                        np.zeros_like(thresholds), np.zeros_like(thresholds),\
-                                        np.zeros_like(thresholds), np.zeros_like(thresholds)
+    thresholds = np.array([0.02, 0.06, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+    precision, recall, f1, tp, fp, fn = (
+        np.zeros_like(thresholds),
+        np.zeros_like(thresholds),
+        np.zeros_like(thresholds),
+        np.zeros_like(thresholds),
+        np.zeros_like(thresholds),
+        np.zeros_like(thresholds),
+    )
 
     gt_scenes = predictions_to_scenes(one_hot_gt)
     for i in range(len(thresholds)):
-        pred_scenes = predictions_to_scenes(
-            (one_hot_pred > thresholds[i]).astype(np.uint8)
-        )
+        pred_scenes = predictions_to_scenes((one_hot_pred > thresholds[i]).astype(np.uint8))
         precision[i], recall[i], f1[i], (tp[i], fp[i], fn[i]) = evaluate_scenes(gt_scenes, pred_scenes)
 
     best_idx = np.argmax(f1)
@@ -163,14 +165,14 @@ def create_scene_based_summaries(one_hot_pred, one_hot_gt, prefix="test", step=0
 
     valid_idx = np.logical_and(recall != 0, precision != 0)
 
-    tf.summary.image(prefix + "/precision_recall",
-                     graph(data=[(recall[valid_idx], precision[valid_idx])],
-                           labels=("Recall", "Precision"),
-                           marker=".")[np.newaxis],
-                     step=step)
-    tf.summary.image(prefix + "/f1_score",
-                     graph(data=[(thresholds[valid_idx], f1[valid_idx])],
-                           labels=("Threshold", "F1 Score"),
-                           marker=".")[np.newaxis],
-                     step=step)
+    tf.summary.image(
+        prefix + "/precision_recall",
+        graph(data=[(recall[valid_idx], precision[valid_idx])], labels=("Recall", "Precision"), marker=".")[np.newaxis],
+        step=step,
+    )
+    tf.summary.image(
+        prefix + "/f1_score",
+        graph(data=[(thresholds[valid_idx], f1[valid_idx])], labels=("Threshold", "F1 Score"), marker=".")[np.newaxis],
+        step=step,
+    )
     return f1[best_idx]

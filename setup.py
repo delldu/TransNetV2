@@ -16,9 +16,6 @@ setup(
     },
     packages=["transnetv2"],
     package_dir={"transnetv2": "./inference"},
-    package_data={"transnetv2": [
-        "transnetv2-weights/*",
-        "transnetv2-weights/variables/*"
-    ]},
-    zip_safe=False
+    package_data={"transnetv2": ["transnetv2-weights/*", "transnetv2-weights/variables/*"]},
+    zip_safe=False,
 )

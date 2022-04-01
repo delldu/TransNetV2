@@ -4,7 +4,6 @@ import tensorflow as tf
 
 
 class OriginalTransNet(tf.keras.Model):
-
     def __init__(self, F=16, L=3, S=2, D=256, name="TransNet"):
         super(OriginalTransNet, self).__init__(name=name)
 
@@ -13,7 +12,7 @@ class OriginalTransNet(tf.keras.Model):
         self.fc2 = tf.keras.layers.Dense(2, activation=None)
 
     def call(self, inputs, training=False):
-        x = inputs / 255.
+        x = inputs / 255.0
         for block in self.blocks:
             x = block(x)
 
@@ -26,7 +25,6 @@ class OriginalTransNet(tf.keras.Model):
 
 
 class StackedDDCNN(tf.keras.layers.Layer):
-
     def __init__(self, n_blocks, filters, name="StackedDDCNN"):
         super(StackedDDCNN, self).__init__(name=name)
         self.blocks = [DilatedDCNN(filters, name="DDCNN_{:d}".format(i)) for i in range(1, n_blocks + 1)]
@@ -42,7 +40,6 @@ class StackedDDCNN(tf.keras.layers.Layer):
 
 
 class DilatedDCNN(tf.keras.layers.Layer):
-
     def __init__(self, filters, name="DilatedDCNN"):
         super(DilatedDCNN, self).__init__(name=name)
 
@@ -53,8 +50,15 @@ class DilatedDCNN(tf.keras.layers.Layer):
 
     @staticmethod
     def _conv3d(filters, dilation_rate, name="Conv3D"):
-        return tf.keras.layers.Conv3D(filters, kernel_size=3, dilation_rate=(dilation_rate, 1, 1),
-                                      padding="SAME", activation=tf.nn.relu, use_bias=True, name=name)
+        return tf.keras.layers.Conv3D(
+            filters,
+            kernel_size=3,
+            dilation_rate=(dilation_rate, 1, 1),
+            padding="SAME",
+            activation=tf.nn.relu,
+            use_bias=True,
+            name=name,
+        )
 
     def call(self, inputs):
         inputs = tf.identity(inputs)
@@ -74,8 +78,9 @@ class ResNet18(tf.keras.Model):
     def __init__(self, name="ResNet18"):
         super(ResNet18, self).__init__(name=name)
 
-        self.conv1 = tf.keras.layers.Conv2D(filters=64, kernel_size=(7, 7), strides=(2, 2),
-                                            padding="SAME", use_bias=False, name="conv1")
+        self.conv1 = tf.keras.layers.Conv2D(
+            filters=64, kernel_size=(7, 7), strides=(2, 2), padding="SAME", use_bias=False, name="conv1"
+        )
         self.bn1 = tf.keras.layers.BatchNormalization(name="conv1/bn")
         self.max_pool = tf.keras.layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2), padding="SAME")
 
@@ -135,8 +140,9 @@ class ResNetBlock(tf.keras.layers.Layer):
     def __init__(self, filters, strides=(1, 1), project=False, name="ResNetBlock"):
         super(ResNetBlock, self).__init__(name=name)
 
-        self.conv1 = tf.keras.layers.Conv2D(filters, kernel_size=(3, 3), strides=strides,
-                                            padding="SAME", use_bias=False, name="conv1")
+        self.conv1 = tf.keras.layers.Conv2D(
+            filters, kernel_size=(3, 3), strides=strides, padding="SAME", use_bias=False, name="conv1"
+        )
         self.bn1 = tf.keras.layers.BatchNormalization(name="conv1/bn")
 
         self.conv2 = tf.keras.layers.Conv2D(filters, kernel_size=(3, 3), padding="SAME", use_bias=False, name="conv2")
@@ -144,8 +150,9 @@ class ResNetBlock(tf.keras.layers.Layer):
 
         self.project = project
         if self.project:
-            self.conv_shortcut = tf.keras.layers.Conv2D(filters, kernel_size=(1, 1), strides=strides,
-                                                        use_bias=False, name="conv_shortcut")
+            self.conv_shortcut = tf.keras.layers.Conv2D(
+                filters, kernel_size=(1, 1), strides=strides, use_bias=False, name="conv_shortcut"
+            )
             self.bn_shortcut = tf.keras.layers.BatchNormalization(name="conv_shortcut/bn")
 
     def call(self, inputs, training=False):
@@ -178,14 +185,21 @@ class C3DConvolutions(tf.keras.Model):
             weights = [None] * 16
 
         def conv(filters, kernel_weights, bias_weights):
-            return tf.keras.layers.Conv3D(filters, kernel_size=3, strides=1, padding="SAME", activation=tf.nn.relu,
-                                          kernel_initializer=tf.constant_initializer(kernel_weights) \
-                                              if kernel_weights is not None else "glorot_uniform",
-                                          bias_initializer=tf.constant_initializer(bias_weights) \
-                                              if bias_weights is not None else "zeros")
+            return tf.keras.layers.Conv3D(
+                filters,
+                kernel_size=3,
+                strides=1,
+                padding="SAME",
+                activation=tf.nn.relu,
+                kernel_initializer=tf.constant_initializer(kernel_weights)
+                if kernel_weights is not None
+                else "glorot_uniform",
+                bias_initializer=tf.constant_initializer(bias_weights) if bias_weights is not None else "zeros",
+            )
 
         self.conv_layers = [
-            conv(f, ker_init, bias_init) for f, ker_init, bias_init in [
+            conv(f, ker_init, bias_init)
+            for f, ker_init, bias_init in [
                 (64, weights[0], weights[1]),
                 (128, weights[2], weights[3]),
                 (256, weights[4], weights[5]),
@@ -193,7 +207,7 @@ class C3DConvolutions(tf.keras.Model):
                 (512, weights[8], weights[9]),
                 (512, weights[10], weights[11]),
                 (512, weights[12], weights[13]),
-                (512, weights[14], weights[15])
+                (512, weights[14], weights[15]),
             ]
         ]
         self.max_pooling = tf.keras.layers.MaxPool3D(pool_size=(1, 2, 2), strides=(1, 2, 2), padding="SAME")
@@ -224,12 +238,12 @@ class C3DConvolutions(tf.keras.Model):
     @staticmethod
     def get_weights(filename):
         import scipy.io as sio
-        return sio.loadmat(filename, squeeze_me=True)['weights']
+
+        return sio.loadmat(filename, squeeze_me=True)["weights"]
 
 
 @gin.configurable(blacklist=["name"])
 class C3DNet(tf.keras.Model):
-
     def __init__(self, D=256, name="C3DNet"):
         super(C3DNet, self).__init__(name=name)
         self.convs = C3DConvolutions()

@@ -92,7 +92,9 @@ class DecoupledWeightDecayExtension:
     def get_config(self):
         config = super().get_config()
         config.update(
-            {"weight_decay": self._serialize_hyperparameter("weight_decay"),}
+            {
+                "weight_decay": self._serialize_hyperparameter("weight_decay"),
+            }
         )
         return config
 
@@ -122,9 +124,7 @@ class DecoupledWeightDecayExtension:
         Raises:
             ValueError: If some of the variables are not `Variable` objects.
         """
-        self._decay_var_list = (
-            set([_ref(v) for v in decay_var_list]) if decay_var_list else False
-        )
+        self._decay_var_list = set([_ref(v) for v in decay_var_list]) if decay_var_list else False
         return super().minimize(loss, var_list=var_list, grad_loss=grad_loss, name=name)
 
     def apply_gradients(self, grads_and_vars, name=None, decay_var_list=None, **kwargs):
@@ -148,23 +148,17 @@ class DecoupledWeightDecayExtension:
             TypeError: If `grads_and_vars` is malformed.
             ValueError: If none of the variables have gradients.
         """
-        self._decay_var_list = (
-            set([_ref(v) for v in decay_var_list]) if decay_var_list else False
-        )
+        self._decay_var_list = set([_ref(v) for v in decay_var_list]) if decay_var_list else False
         return super().apply_gradients(grads_and_vars, name=name, **kwargs)
 
     def _decay_weights_op(self, var):
         if not self._decay_var_list or _ref(var) in self._decay_var_list:
-            return var.assign_sub(
-                self._get_hyper("weight_decay", var.dtype) * var, self._use_locking
-            )
+            return var.assign_sub(self._get_hyper("weight_decay", var.dtype) * var, self._use_locking)
         return tf.no_op()
 
     def _decay_weights_sparse_op(self, var, indices):
         if not self._decay_var_list or _ref(var) in self._decay_var_list:
-            update = -self._get_hyper("weight_decay", var.dtype) * tf.gather(
-                var, indices
-            )
+            update = -self._get_hyper("weight_decay", var.dtype) * tf.gather(var, indices)
             return self._resource_scatter_add(var, indices, update)
         return tf.no_op()
 
@@ -241,9 +235,7 @@ def extend_with_decoupled_weight_decay(
         and base_optimizer.
     """
 
-    class OptimizerWithDecoupledWeightDecay(
-        DecoupledWeightDecayExtension, base_optimizer
-    ):
+    class OptimizerWithDecoupledWeightDecay(DecoupledWeightDecayExtension, base_optimizer):
         """Base_optimizer with decoupled weight decay.
 
         This class computes the update step of `base_optimizer` and
@@ -258,9 +250,7 @@ def extend_with_decoupled_weight_decay(
         training loss and generalization error in the paper above.
         """
 
-        def __init__(
-            self, weight_decay: Union[FloatTensorLike, Callable], *args, **kwargs
-        ):
+        def __init__(self, weight_decay: Union[FloatTensorLike, Callable], *args, **kwargs):
             # super delegation is necessary here
             super().__init__(weight_decay, *args, **kwargs)
 

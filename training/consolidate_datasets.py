@@ -75,20 +75,20 @@ csv_data = []
 
 for fn in tqdm(glob.glob(BBC_mp4_files)):
     fn = os.path.abspath(fn)
-    
+
     fn_idx = os.path.basename(fn).split(".")[0].split("_")[1]
     gt_fn = glob.glob(os.path.join(BBC_txt_files, fn_idx + "*"))[0]
-    
+
     scenes = np.loadtxt(gt_fn, dtype=np.int32, ndmin=2)
     scenes = scenes + 1
     if scenes[0][0] == 1:
         scenes[0][0] = 0
-    
+
     video = get_frames(fn)
-    
+
     save_to = os.path.abspath(os.path.join(BBC_target_dir, fn_idx))
     np.savetxt(save_to + ".txt", scenes, fmt="%d")
-    
+
     visualize_scenes(video, scenes).save(save_to + ".png")
     csv_data.append("{},{}".format(fn, save_to + ".txt"))
 
@@ -101,16 +101,16 @@ csv_data = []
 
 for fn in tqdm(glob.glob(RAI_mp4_files)):
     fn = os.path.abspath(fn)
-    
+
     fn_idx = os.path.basename(fn).split(".")[0]
     gt_fn = os.path.join(RAI_txt_files, fn_idx + "_gt.txt")
-    
+
     scenes = np.loadtxt(gt_fn, dtype=np.int32, ndmin=2)
     video = get_frames(fn)
-    
+
     save_to = os.path.abspath(os.path.join(RAI_target_dir, fn_idx))
     np.savetxt(save_to + ".txt", scenes, fmt="%d")
-    
+
     visualize_scenes(video, scenes).save(save_to + ".png")
     csv_data.append("{},{}".format(fn, save_to + ".txt"))
 
@@ -123,17 +123,17 @@ csv_data = []
 
 for fn in tqdm(glob.glob(IACC3_SUBSET100_mp4_files)):
     fn = os.path.abspath(fn)
-    
+
     fn_idx = os.path.basename(fn).split(".")[0]
     gt_fn = os.path.join(IACC3_SUBSET100_txt_files, fn_idx + ".txt")
-    
+
     video = get_frames(fn)
     transition_frames = np.loadtxt(gt_fn, dtype=np.int32, ndmin=1) if open(gt_fn).read() != "" else []
     scenes = get_scenes_from_transition_frames(transition_frames, len(video))
-    
+
     save_to = os.path.abspath(os.path.join(IACC3_SUBSET100_target_dir, fn_idx))
     np.savetxt(save_to + ".txt", scenes, fmt="%d")
-    
+
     visualize_scenes(video, scenes).save(save_to + ".png")
     csv_data.append("{},{}".format(fn, save_to + ".txt"))
 
@@ -147,16 +147,16 @@ id2filename = dict(pd.read_csv(IACC3_RANDOM3000_map_file, delimiter=";", header=
 
 for fn in tqdm(glob.glob(IACC3_RANDOM3000_mp4_files)):
     fn = os.path.abspath(fn)
-    
+
     fn_idx = os.path.basename(fn).split(".")[0]
     gt_fn = os.path.join(IACC3_RANDOM3000_txt_files, id2filename[int(fn_idx)][:-4] + ".msb")
-    
+
     scenes = np.loadtxt(gt_fn, dtype=np.int32, skiprows=2, ndmin=2)
     video = get_frames(fn)
-    
+
     save_to = os.path.abspath(os.path.join(IACC3_RANDOM3000_target_dir, fn_idx))
     np.savetxt(save_to + ".txt", scenes, fmt="%d")
-    
+
     visualize_scenes(video, scenes).save(save_to + ".png")
     csv_data.append("{},{}".format(fn, save_to + ".txt"))
 
@@ -173,8 +173,8 @@ def clipshots_dataset(txt_files, mp4_files, target_dir):
         k = os.path.basename(fn)
 
         # number of frames must be integer, check it is true
-        assert int(gt_data[k]['frame_num']) == gt_data[k]['frame_num']
-        n_frames = int(gt_data[k]['frame_num'])
+        assert int(gt_data[k]["frame_num"]) == gt_data[k]["frame_num"]
+        n_frames = int(gt_data[k]["frame_num"])
 
         video = get_frames(fn)
         if video is None:
@@ -184,11 +184,17 @@ def clipshots_dataset(txt_files, mp4_files, target_dir):
         plus = 0
         if len(video) != n_frames:
             if len(video) != n_frames + 1:
-                print("ERROR: {} video length {} vs length specified in gt {}, skipping it".format(
-                    k, len(video), n_frames))
+                print(
+                    "ERROR: {} video length {} vs length specified in gt {}, skipping it".format(
+                        k, len(video), n_frames
+                    )
+                )
                 continue
-            print("WARN: {} video length {} vs length specified in gt {}, adjusting ground truth".format(
-                k, len(video), n_frames))
+            print(
+                "WARN: {} video length {} vs length specified in gt {}, adjusting ground truth".format(
+                    k, len(video), n_frames
+                )
+            )
             plus = 1
             n_frames = len(video)
 

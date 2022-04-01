@@ -63,7 +63,7 @@ def check_and_fix_dicts(tf_dict, torch_dict):
     for k in torch_dict.keys():
         if k not in tf_dict:
             if k.endswith("num_batches_tracked"):
-                tf_dict[k] = torch.tensor(1., dtype=torch.float32)
+                tf_dict[k] = torch.tensor(1.0, dtype=torch.float32)
             else:
                 print("!", k, "missing in TF")
                 error = True
@@ -84,7 +84,9 @@ def convert_weights(tf_weights_dir):
     tf_dict = {remap_name(v.name): remap_tensor(v) for v in tf_model.variables}
 
     torch_model = transnetv2_pytorch.TransNetV2()
-    torch_dict = {k: tuple(v.shape) for k, v in list(torch_model.named_parameters()) + list(torch_model.named_buffers())}
+    torch_dict = {
+        k: tuple(v.shape) for k, v in list(torch_model.named_parameters()) + list(torch_model.named_buffers())
+    }
 
     assert check_and_fix_dicts(tf_dict, torch_dict), "some errors occurred when converting"
     torch_model.load_state_dict(tf_dict)
@@ -104,16 +106,19 @@ def test_models(torch_model, tf_model):
         single = np.isclose(torch_single.numpy(), tf_single.numpy()).mean()
         many = np.isclose(torch_many["many_hot"].numpy(), tf_many["many_hot"].numpy()).mean()
 
-        print(f"Test {i:2d}: "
-              f"{single * 100:5.1f}% of 'single' predictions matching, "
-              f"{many * 100:5.1f}% of 'many' predictions matching")
+        print(
+            f"Test {i:2d}: "
+            f"{single * 100:5.1f}% of 'single' predictions matching, "
+            f"{many * 100:5.1f}% of 'many' predictions matching"
+        )
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--tf_weights", type=str, help="path to TransNet V2 weights",
-                        default="../inference/transnetv2-weights/")
-    parser.add_argument('--test', action="store_true", help="run tests")
+    parser.add_argument(
+        "--tf_weights", type=str, help="path to TransNet V2 weights", default="../inference/transnetv2-weights/"
+    )
+    parser.add_argument("--test", action="store_true", help="run tests")
     args = parser.parse_args()
 
     torch_model, tf_model = convert_weights(args.tf_weights)

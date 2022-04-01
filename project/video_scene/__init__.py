@@ -18,7 +18,6 @@ import torch
 import redos
 import todos
 
-import cv2
 import torchvision.transforms as T
 from PIL import Image
 import numpy as np
@@ -28,11 +27,8 @@ from . import scene
 import pdb
 
 
-NEIGHBOR_STRIDE = 5  # neighbor radius
-REFERENCE_STRIDE = 10
-
-MODEL_H_TILE_SIZE = 240
-MODEL_W_TILE_SIZE = 432
+DETECT_IMAGE_HEIGHT = 27
+DETECT_IMAGE_WIDTH = 48
 
 
 def get_model():
@@ -48,11 +44,11 @@ def get_model():
     model = model.to(device)
     model.eval()
 
-    # model = torch.jit.script(model)
+    model = torch.jit.script(model)
 
-    # todos.data.mkdir("output")
-    # if not os.path.exists("output/video_scene.torch"):
-    #     model.save("output/video_scene.torch")
+    todos.data.mkdir("output")
+    if not os.path.exists("output/video_scene.torch"):
+        model.save("output/video_scene.torch")
 
     return model, device
 
@@ -76,18 +72,19 @@ def video_service(input_file, output_file, targ):
 
     frame_list = []
     print(f"  process {input_file}, save to {output_file} ...")
-    progress_bar = tqdm(total=video.n_frames)
+
+    print("Start decode video ...")
+    decode_progress_bar = tqdm(total=video.n_frames)
     def reading_video_frames(no, data):
-        progress_bar.update(1)
-        # print(f"frame: {no} -- {data.shape}"), 
+        decode_progress_bar.update(1)
+        # print(f"frame: {no} -- {data.shape}"),
         # data -- np.frombuffer(buffer, np.uint8).reshape([self.height, self.width, 4])
-        image = Image.fromarray(data).resize((48,27)).convert("RGB")
-        tensor = torch.from_numpy(np.array(image)).unsqueeze(0)
+        image = Image.fromarray(data).resize((DETECT_IMAGE_WIDTH, DETECT_IMAGE_HEIGHT)).convert("RGB")
+        tensor = torch.from_numpy(np.array(image)).unsqueeze(0) # 1x3x27x48, range [0, 255]
 
         frame_list.append(tensor)
-
     video.forward(callback=reading_video_frames)
-
+    del decode_progress_bar
 
     no_padded_frames_start = 25
     no_padded_frames_end = 25 + 50 - (len(frame_list) % 50 if len(frame_list) % 50 != 0 else 50)  # 25 - 74
@@ -98,11 +95,12 @@ def video_service(input_file, output_file, targ):
     end_frame = frame_list[-1]
     padded_list = [start_frame] * no_padded_frames_start + frame_list + [end_frame] * no_padded_frames_end
 
+    print("Start scene detection ... ")
     predict_list = []
-    progress_bar = tqdm(total=len(padded_list))
+    detect_progress_bar = tqdm(total=len(padded_list))
     for index in range(0, len(padded_list), 50):
-        progress_bar.update(50)
-        input_tensor = torch.cat(padded_list[index:index + 100], dim=0).unsqueeze(0).to(device)
+        detect_progress_bar.update(50)
+        input_tensor = torch.cat(padded_list[index : index + 100], dim=0).to(device)
 
         with torch.no_grad():
             single_frame_pred, all_frame_pred = model(input_tensor)
@@ -110,8 +108,8 @@ def video_service(input_file, output_file, targ):
         single_frame_pred = torch.sigmoid(single_frame_pred).cpu()
         predict_list.append(single_frame_pred[:, 25:75, :])
 
-    predict_list = predict_list[0: len(frame_list)]
-    prediction_tensor = torch.cat(predict_list, dim = 1)
+    predict_list = predict_list[0 : len(frame_list)]
+    prediction_tensor = torch.cat(predict_list, dim=1)
 
     # torch.where(prediction_tensor > 0.5)[1].size() -- torch.Size([110])
     # index -- torch.where(prediction_tensor > 0.5)[1].tolist()
@@ -121,11 +119,11 @@ def video_service(input_file, output_file, targ):
     for index in torch.where(prediction_tensor > 0.5)[1].tolist():
         if index > start + 5:
             sbd_list.append((start, index))
-            start = index + 1 # next
+            start = index + 1  # next
     if start < len(frame_list) - 5:
         sbd_list.append((start, len(frame_list) - 1))
 
-    with open(output_file,'w') as f:
+    with open(output_file, "w") as f:
         for (s, e) in sbd_list:
             f.write(f"{s} {e}\n")
 

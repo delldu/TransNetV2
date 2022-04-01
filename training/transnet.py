@@ -8,23 +8,30 @@ from models import ResNet18, ResNetBlock
 
 @gin.configurable(blacklist=["name"])
 class TransNetV2(tf.keras.Model):
-
-    def __init__(self, F=16, L=3, S=2, D=256,
-                 use_resnet_features=False,
-                 use_many_hot_targets=False,
-                 use_frame_similarity=False,
-                 use_mean_pooling=False,
-                 use_convex_comb_reg=False,
-                 dropout_rate=None,
-                 use_resnet_like_top=False,
-                 frame_similarity_on_last_layer=False,
-                 use_color_histograms=False,
-                 name="TransNet"):
+    def __init__(
+        self,
+        F=16,
+        L=3,
+        S=2,
+        D=256,
+        use_resnet_features=False,
+        use_many_hot_targets=False,
+        use_frame_similarity=False,
+        use_mean_pooling=False,
+        use_convex_comb_reg=False,
+        dropout_rate=None,
+        use_resnet_like_top=False,
+        frame_similarity_on_last_layer=False,
+        use_color_histograms=False,
+        name="TransNet",
+    ):
         super(TransNetV2, self).__init__(name=name)
 
-        self.resnet_layers = ResNetFeatures() if use_resnet_features else (lambda x, training=False: x / 255.)
-        self.blocks = [StackedDDCNNV2(n_blocks=S, filters=F, stochastic_depth_drop_prob=0., name="SDDCNN_1")]
-        self.blocks += [StackedDDCNNV2(n_blocks=S, filters=F * 2**i, name="SDDCNN_{:d}".format(i + 1)) for i in range(1, L)]
+        self.resnet_layers = ResNetFeatures() if use_resnet_features else (lambda x, training=False: x / 255.0)
+        self.blocks = [StackedDDCNNV2(n_blocks=S, filters=F, stochastic_depth_drop_prob=0.0, name="SDDCNN_1")]
+        self.blocks += [
+            StackedDDCNNV2(n_blocks=S, filters=F * 2 ** i, name="SDDCNN_{:d}".format(i + 1)) for i in range(1, L)
+        ]
         self.fc1 = tf.keras.layers.Dense(D, activation=tf.nn.relu)
         self.cls_layer1 = tf.keras.layers.Dense(1, activation=None)
         self.cls_layer2 = tf.keras.layers.Dense(1, activation=None) if use_many_hot_targets else None
@@ -37,12 +44,18 @@ class TransNetV2(tf.keras.Model):
         self.frame_similarity_on_last_layer = frame_similarity_on_last_layer
         self.resnet_like_top = use_resnet_like_top
         if self.resnet_like_top:
-            self.resnet_like_top_conv = tf.keras.layers.Conv3D(filters=32, kernel_size=(3, 7, 7), strides=(1, 2, 2),
-                                                               padding="SAME", use_bias=False,
-                                                               name="resnet_like_top/conv")
+            self.resnet_like_top_conv = tf.keras.layers.Conv3D(
+                filters=32,
+                kernel_size=(3, 7, 7),
+                strides=(1, 2, 2),
+                padding="SAME",
+                use_bias=False,
+                name="resnet_like_top/conv",
+            )
             self.resnet_like_top_bn = tf.keras.layers.BatchNormalization(name="resnet_like_top/bn")
-            self.resnet_like_top_max_pool = tf.keras.layers.MaxPooling3D(pool_size=(1, 3, 3), strides=(1, 2, 2),
-                                                                         padding="SAME")
+            self.resnet_like_top_max_pool = tf.keras.layers.MaxPooling3D(
+                pool_size=(1, 3, 3), strides=(1, 2, 2), padding="SAME"
+            )
 
     def call(self, inputs, training=False):
         out_dict = {}
@@ -94,9 +107,16 @@ class TransNetV2(tf.keras.Model):
 
 @gin.configurable(whitelist=["shortcut", "use_octave_conv", "pool_type", "stochastic_depth_drop_prob"])
 class StackedDDCNNV2(tf.keras.layers.Layer):
-
-    def __init__(self, n_blocks, filters, shortcut=False, use_octave_conv=False, pool_type="max",
-                 stochastic_depth_drop_prob=0., name="StackedDDCNN"):
+    def __init__(
+        self,
+        n_blocks,
+        filters,
+        shortcut=False,
+        use_octave_conv=False,
+        pool_type="max",
+        stochastic_depth_drop_prob=0.0,
+        name="StackedDDCNN",
+    ):
         super(StackedDDCNNV2, self).__init__(name=name)
         assert pool_type == "max" or pool_type == "avg"
         if use_octave_conv and pool_type == "max":
@@ -108,11 +128,20 @@ class StackedDDCNNV2(tf.keras.layers.Layer):
         #     self.shortcut = tf.keras.layers.Conv3D(filters * 4, kernel_size=1, dilation_rate=1, padding="SAME",
         #                                            activation=None, use_bias=True, name="shortcut")
 
-        self.blocks = [DilatedDCNNV2(filters, octave_conv=use_octave_conv,
-                                     activation=tf.nn.relu if i != n_blocks else None,
-                                     name="DDCNN_{:d}".format(i)) for i in range(1, n_blocks + 1)]
-        self.pool = tf.keras.layers.MaxPool3D(pool_size=(1, 2, 2)) if pool_type == "max" else \
-            tf.keras.layers.AveragePooling3D(pool_size=(1, 2, 2))
+        self.blocks = [
+            DilatedDCNNV2(
+                filters,
+                octave_conv=use_octave_conv,
+                activation=tf.nn.relu if i != n_blocks else None,
+                name="DDCNN_{:d}".format(i),
+            )
+            for i in range(1, n_blocks + 1)
+        ]
+        self.pool = (
+            tf.keras.layers.MaxPool3D(pool_size=(1, 2, 2))
+            if pool_type == "max"
+            else tf.keras.layers.AveragePooling3D(pool_size=(1, 2, 2))
+        )
         self.octave = use_octave_conv
         self.stochastic_depth_drop_prob = stochastic_depth_drop_prob
 
@@ -133,10 +162,11 @@ class StackedDDCNNV2(tf.keras.layers.Layer):
 
         if self.shortcut is not None:
             # shortcut = self.shortcut(inputs)
-            if self.stochastic_depth_drop_prob != 0.:
+            if self.stochastic_depth_drop_prob != 0.0:
                 if training:
-                    x = tf.cond(tf.random.uniform([]) < self.stochastic_depth_drop_prob,
-                                lambda: shortcut, lambda: x + shortcut)
+                    x = tf.cond(
+                        tf.random.uniform([]) < self.stochastic_depth_drop_prob, lambda: shortcut, lambda: x + shortcut
+                    )
                 else:
                     x = (1 - self.stochastic_depth_drop_prob) * x + shortcut
             else:
@@ -149,7 +179,6 @@ class StackedDDCNNV2(tf.keras.layers.Layer):
 
 @gin.configurable(whitelist=["batch_norm"])
 class DilatedDCNNV2(tf.keras.layers.Layer):
-
     def __init__(self, filters, batch_norm=False, activation=None, octave_conv=False, name="DilatedDCNN"):
         super(DilatedDCNNV2, self).__init__(name=name)
         assert not (octave_conv and batch_norm)
@@ -170,8 +199,10 @@ class DilatedDCNNV2(tf.keras.layers.Layer):
         conv4 = self.conv4(inputs, training=training)
 
         if self.octave:
-            x = [tf.concat([conv1[0], conv2[0], conv3[0], conv4[0]], axis=4),
-                 tf.concat([conv1[1], conv2[1], conv3[1], conv4[1]], axis=4)]
+            x = [
+                tf.concat([conv1[0], conv2[0], conv3[0], conv4[0]], axis=4),
+                tf.concat([conv1[1], conv2[1], conv3[1], conv4[1]], axis=4),
+            ]
         else:
             x = tf.concat([conv1, conv2, conv3, conv4], axis=4)
 
@@ -188,35 +219,62 @@ class DilatedDCNNV2(tf.keras.layers.Layer):
 
 @gin.configurable(whitelist=["separable", "kernel_initializer"])
 class Conv3DConfigurable(tf.keras.layers.Layer):
-
-    def __init__(self,
-                 filters,
-                 dilation_rate,
-                 separable=False,
-                 octave=False,
-                 use_bias=True,
-                 kernel_initializer="glorot_uniform",
-                 name="Conv3D"):
+    def __init__(
+        self,
+        filters,
+        dilation_rate,
+        separable=False,
+        octave=False,
+        use_bias=True,
+        kernel_initializer="glorot_uniform",
+        name="Conv3D",
+    ):
         super(Conv3DConfigurable, self).__init__(name=name)
         assert not (separable and octave)
 
         if separable:
             # (2+1)D convolution https://arxiv.org/pdf/1711.11248.pdf
-            conv1 = tf.keras.layers.Conv3D(2 * filters, kernel_size=(1, 3, 3), dilation_rate=(1, 1, 1),
-                                           padding="SAME", activation=None, use_bias=False,
-                                           name="conv_spatial", kernel_initializer=kernel_initializer)
-            conv2 = tf.keras.layers.Conv3D(filters, kernel_size=(3, 1, 1), dilation_rate=(dilation_rate, 1, 1),
-                                           padding="SAME", activation=None, use_bias=use_bias, name="conv_temporal",
-                                           kernel_initializer=kernel_initializer)
+            conv1 = tf.keras.layers.Conv3D(
+                2 * filters,
+                kernel_size=(1, 3, 3),
+                dilation_rate=(1, 1, 1),
+                padding="SAME",
+                activation=None,
+                use_bias=False,
+                name="conv_spatial",
+                kernel_initializer=kernel_initializer,
+            )
+            conv2 = tf.keras.layers.Conv3D(
+                filters,
+                kernel_size=(3, 1, 1),
+                dilation_rate=(dilation_rate, 1, 1),
+                padding="SAME",
+                activation=None,
+                use_bias=use_bias,
+                name="conv_temporal",
+                kernel_initializer=kernel_initializer,
+            )
             self.layers = [conv1, conv2]
         elif octave:
-            conv = OctConv3D(filters, kernel_size=3, dilation_rate=(dilation_rate, 1, 1), use_bias=use_bias,
-                             kernel_initializer=kernel_initializer)
+            conv = OctConv3D(
+                filters,
+                kernel_size=3,
+                dilation_rate=(dilation_rate, 1, 1),
+                use_bias=use_bias,
+                kernel_initializer=kernel_initializer,
+            )
             self.layers = [conv]
         else:
-            conv = tf.keras.layers.Conv3D(filters, kernel_size=3, dilation_rate=(dilation_rate, 1, 1),
-                                          padding="SAME", activation=None, use_bias=use_bias, name="conv",
-                                          kernel_initializer=kernel_initializer)
+            conv = tf.keras.layers.Conv3D(
+                filters,
+                kernel_size=3,
+                dilation_rate=(dilation_rate, 1, 1),
+                padding="SAME",
+                activation=None,
+                use_bias=use_bias,
+                name="conv",
+                kernel_initializer=kernel_initializer,
+            )
             self.layers = [conv]
 
     def call(self, inputs):
@@ -228,30 +286,61 @@ class Conv3DConfigurable(tf.keras.layers.Layer):
 
 @gin.configurable(whitelist=["alpha"])
 class OctConv3D(tf.keras.layers.Layer):
-
-    def __init__(self, filters, kernel_size=3, dilation_rate=(1, 1, 1), alpha=0.25,
-                 use_bias=True, kernel_initializer="glorot_uniform", name="OctConv3D"):
+    def __init__(
+        self,
+        filters,
+        kernel_size=3,
+        dilation_rate=(1, 1, 1),
+        alpha=0.25,
+        use_bias=True,
+        kernel_initializer="glorot_uniform",
+        name="OctConv3D",
+    ):
         super(OctConv3D, self).__init__(name=name)
 
         self.low_channels = int(filters * alpha)
         self.high_channels = filters - self.low_channels
 
-        self.high_to_high = tf.keras.layers.Conv3D(self.high_channels, kernel_size=kernel_size, activation=None,
-                                                   dilation_rate=dilation_rate, padding="SAME",
-                                                   use_bias=use_bias, kernel_initializer=kernel_initializer,
-                                                   name="high_to_high")
-        self.high_to_low = tf.keras.layers.Conv3D(self.low_channels, kernel_size=kernel_size, activation=None,
-                                                  dilation_rate=dilation_rate, padding="SAME",
-                                                  use_bias=False, kernel_initializer=kernel_initializer,
-                                                  name="high_to_low")
-        self.low_to_high = tf.keras.layers.Conv3D(self.high_channels, kernel_size=kernel_size, activation=None,
-                                                  dilation_rate=dilation_rate, padding="SAME",
-                                                  use_bias=False, kernel_initializer=kernel_initializer,
-                                                  name="low_to_high")
-        self.low_to_low = tf.keras.layers.Conv3D(self.low_channels, kernel_size=kernel_size, activation=None,
-                                                 dilation_rate=dilation_rate, padding="SAME",
-                                                 use_bias=use_bias, kernel_initializer=kernel_initializer,
-                                                 name="low_to_low")
+        self.high_to_high = tf.keras.layers.Conv3D(
+            self.high_channels,
+            kernel_size=kernel_size,
+            activation=None,
+            dilation_rate=dilation_rate,
+            padding="SAME",
+            use_bias=use_bias,
+            kernel_initializer=kernel_initializer,
+            name="high_to_high",
+        )
+        self.high_to_low = tf.keras.layers.Conv3D(
+            self.low_channels,
+            kernel_size=kernel_size,
+            activation=None,
+            dilation_rate=dilation_rate,
+            padding="SAME",
+            use_bias=False,
+            kernel_initializer=kernel_initializer,
+            name="high_to_low",
+        )
+        self.low_to_high = tf.keras.layers.Conv3D(
+            self.high_channels,
+            kernel_size=kernel_size,
+            activation=None,
+            dilation_rate=dilation_rate,
+            padding="SAME",
+            use_bias=False,
+            kernel_initializer=kernel_initializer,
+            name="low_to_high",
+        )
+        self.low_to_low = tf.keras.layers.Conv3D(
+            self.low_channels,
+            kernel_size=kernel_size,
+            activation=None,
+            dilation_rate=dilation_rate,
+            padding="SAME",
+            use_bias=use_bias,
+            kernel_initializer=kernel_initializer,
+            name="low_to_low",
+        )
         self.upsampler = tf.keras.layers.UpSampling3D(size=(1, 2, 2))
         self.downsampler = tf.keras.layers.AveragePooling3D(pool_size=(1, 2, 2), strides=(1, 2, 2), padding="SAME")
 
@@ -274,8 +363,8 @@ class OctConv3D(tf.keras.layers.Layer):
         low_to_high = self.upsampler(self.low_to_high(low_inputs))
         low_to_low = self.low_to_low(low_inputs)
 
-        high_output = high_to_high[:, :, :tf.shape(low_to_high)[2], :tf.shape(low_to_high)[3]] + low_to_high
-        low_output = low_to_low + high_to_low[:, :, :tf.shape(low_to_low)[2], :tf.shape(low_to_low)[3]]
+        high_output = high_to_high[:, :, : tf.shape(low_to_high)[2], : tf.shape(low_to_high)[3]] + low_to_high
+        low_output = low_to_low + high_to_low[:, :, : tf.shape(low_to_low)[2], : tf.shape(low_to_low)[3]]
 
         # print("OctConv3D:", low_inputs.shape, "->", low_output.shape, "|", high_inputs.shape, "->", high_output.shape)
         return low_output, high_output
@@ -283,12 +372,12 @@ class OctConv3D(tf.keras.layers.Layer):
 
 @gin.configurable(whitelist=["trainable"])
 class ResNetFeatures(tf.keras.layers.Layer):
-
     def __init__(self, trainable=False, name="ResNetFeatures"):
         super(ResNetFeatures, self).__init__(trainable=trainable, name=name)
 
-        self.conv1 = tf.keras.layers.Conv2D(filters=64, kernel_size=(7, 7), strides=(2, 2),
-                                            padding="SAME", use_bias=False, name="conv1")
+        self.conv1 = tf.keras.layers.Conv2D(
+            filters=64, kernel_size=(7, 7), strides=(2, 2), padding="SAME", use_bias=False, name="conv1"
+        )
         self.bn1 = tf.keras.layers.BatchNormalization(name="conv1/bn")
         self.max_pool = tf.keras.layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2), padding="SAME")
 
@@ -324,21 +413,22 @@ class ResNetFeatures(tf.keras.layers.Layer):
                 if name[0].startswith("Block"):
                     name = name[:1] + name
                 else:
-                    name = name[:len(name) - 1] + name
+                    name = name[: len(name) - 1] + name
                 name = "/".join(name)
                 v.assign(f[name][:])
 
 
 @gin.configurable(whitelist=["similarity_dim", "lookup_window", "output_dim", "stop_gradient", "use_bias"])
 class FrameSimilarity(tf.keras.layers.Layer):
-
-    def __init__(self,
-                 similarity_dim=128,
-                 lookup_window=101,
-                 output_dim=128,
-                 stop_gradient=False,
-                 use_bias=False,
-                 name="FrameSimilarity"):
+    def __init__(
+        self,
+        similarity_dim=128,
+        lookup_window=101,
+        output_dim=128,
+        stop_gradient=False,
+        use_bias=False,
+        name="FrameSimilarity",
+    ):
         super(FrameSimilarity, self).__init__(name=name)
 
         self.projection = tf.keras.layers.Dense(similarity_dim, use_bias=use_bias, activation=None)
@@ -349,9 +439,7 @@ class FrameSimilarity(tf.keras.layers.Layer):
         assert lookup_window % 2 == 1, "`lookup_window` must be odd integer"
 
     def call(self, inputs):
-        x = tf.concat([
-            tf.math.reduce_mean(x, axis=[2, 3]) for x in inputs
-        ], axis=2)
+        x = tf.concat([tf.math.reduce_mean(x, axis=[2, 3]) for x in inputs], axis=2)
 
         if self.stop_gradient:
             x = tf.stop_gradient(x)
@@ -369,9 +457,10 @@ class FrameSimilarity(tf.keras.layers.Layer):
         time_indices = tf.tile(
             tf.reshape(tf.range(time_window), [1, time_window, 1]), [batch_size, 1, self.lookup_window]
         )
-        lookup_indices = tf.tile(
-            tf.reshape(tf.range(self.lookup_window), [1, 1, self.lookup_window]), [batch_size, time_window, 1]
-        ) + time_indices
+        lookup_indices = (
+            tf.tile(tf.reshape(tf.range(self.lookup_window), [1, 1, self.lookup_window]), [batch_size, time_window, 1])
+            + time_indices
+        )
 
         indices = tf.stack([batch_indices, time_indices, lookup_indices], -1)
 
@@ -381,14 +470,15 @@ class FrameSimilarity(tf.keras.layers.Layer):
 
 @gin.configurable(whitelist=["filters", "delta_scale", "loss_weight"])
 class ConvexCombinationRegularization(tf.keras.layers.Layer):
-
-    def __init__(self, filters=32, delta_scale=10., loss_weight=0.01, name="ConvexCombinationRegularization"):
+    def __init__(self, filters=32, delta_scale=10.0, loss_weight=0.01, name="ConvexCombinationRegularization"):
         super(ConvexCombinationRegularization, self).__init__(name=name)
 
-        self.projection = tf.keras.layers.Conv3D(filters, kernel_size=1, dilation_rate=1, padding="SAME",
-                                                 activation=tf.nn.relu, use_bias=True)
-        self.features = tf.keras.layers.Conv3D(filters * 2, kernel_size=(3, 3, 3), dilation_rate=1, padding="SAME",
-                                               activation=tf.nn.relu, use_bias=True)
+        self.projection = tf.keras.layers.Conv3D(
+            filters, kernel_size=1, dilation_rate=1, padding="SAME", activation=tf.nn.relu, use_bias=True
+        )
+        self.features = tf.keras.layers.Conv3D(
+            filters * 2, kernel_size=(3, 3, 3), dilation_rate=1, padding="SAME", activation=tf.nn.relu, use_bias=True
+        )
         self.dense = tf.keras.layers.Dense(1, activation=None, use_bias=True)
         self.loss = tf.keras.losses.Huber(reduction=tf.keras.losses.Reduction.NONE)
         self.delta_scale = delta_scale
@@ -415,7 +505,7 @@ class ConvexCombinationRegularization(tf.keras.layers.Layer):
 
         alpha_ = tf.nn.sigmoid(alpha)
         alpha_ = tf.reshape(alpha_, [batch_size, window_size, 1, 1, 1])
-        predictions_ = (alpha_ * first_img + (1 - alpha_) * last_img)
+        predictions_ = alpha_ * first_img + (1 - alpha_) * last_img
 
         loss_ = self.loss(y_true=image_inputs / self.delta_scale, y_pred=predictions_ / self.delta_scale)
         loss_ = self.loss_weight * tf.math.reduce_mean(loss_)
@@ -424,7 +514,6 @@ class ConvexCombinationRegularization(tf.keras.layers.Layer):
 
 @gin.configurable(whitelist=["lookup_window", "output_dim"])
 class ColorHistograms(tf.keras.layers.Layer):
-
     def __init__(self, lookup_window=101, output_dim=None, name="ColorHistograms"):
         super(ColorHistograms, self).__init__(name=name)
 
@@ -442,8 +531,12 @@ class ColorHistograms(tf.keras.layers.Layer):
             R, G, B = tf.bitwise.right_shift(R, 5), tf.bitwise.right_shift(G, 5), tf.bitwise.right_shift(B, 5)
             return tf.bitwise.left_shift(R, 6) + tf.bitwise.left_shift(G, 3) + B
 
-        batch_size, time_window, height, width = tf.shape(frames)[0], tf.shape(frames)[1], tf.shape(frames)[2], \
-                                                 tf.shape(frames)[3]
+        batch_size, time_window, height, width = (
+            tf.shape(frames)[0],
+            tf.shape(frames)[1],
+            tf.shape(frames)[2],
+            tf.shape(frames)[3],
+        )
         no_channels = frames.shape[-1]
         assert no_channels == 3 or no_channels == 6
         if no_channels == 3:
@@ -476,9 +569,10 @@ class ColorHistograms(tf.keras.layers.Layer):
         time_indices = tf.tile(
             tf.reshape(tf.range(time_window), [1, time_window, 1]), [batch_size, 1, self.lookup_window]
         )
-        lookup_indices = tf.tile(
-            tf.reshape(tf.range(self.lookup_window), [1, 1, self.lookup_window]), [batch_size, time_window, 1]
-        ) + time_indices
+        lookup_indices = (
+            tf.tile(tf.reshape(tf.range(self.lookup_window), [1, 1, self.lookup_window]), [batch_size, time_window, 1])
+            + time_indices
+        )
 
         indices = tf.stack([batch_indices, time_indices, lookup_indices], -1)
 

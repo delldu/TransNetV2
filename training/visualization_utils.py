@@ -11,9 +11,7 @@ def visualize_scenes(frames: np.ndarray, scenes: np.ndarray):
     height = len(frames) // width
 
     scene = frames.reshape([height, width, ih, iw, ic])
-    scene = np.concatenate(np.split(
-        np.concatenate(np.split(scene, height), axis=2)[0], width
-    ), axis=2)[0]
+    scene = np.concatenate(np.split(np.concatenate(np.split(scene, height), axis=2)[0], width), axis=2)[0]
 
     img = Image.fromarray(scene)
     draw = ImageDraw.Draw(img, "RGBA")
@@ -24,17 +22,25 @@ def visualize_scenes(frames: np.ndarray, scenes: np.ndarray):
         draw.rectangle([(w * iw, h * ih), (w * iw + 2, h * ih + ih - 1)], fill=(255, 0, 0))
         draw.polygon(
             [(w * iw + 7, h * ih + ih // 2 - 4), (w * iw + 12, h * ih + ih // 2), (w * iw + 7, h * ih + ih // 2 + 4)],
-            fill=(255, 0, 0))
+            fill=(255, 0, 0),
+        )
         draw.rectangle([(w * iw, h * ih + ih // 2 - 1), (w * iw + 7, h * ih + ih // 2 + 1)], fill=(255, 0, 0))
 
     def draw_end_frame(frame_no):
         w = frame_no % width
         h = frame_no // width
         draw.rectangle([(w * iw + iw - 1, h * ih), (w * iw + iw - 3, h * ih + ih - 1)], fill=(255, 0, 0))
-        draw.polygon([(w * iw + iw - 8, h * ih + ih // 2 - 4), (w * iw + iw - 13, h * ih + ih // 2),
-                      (w * iw + iw - 8, h * ih + ih // 2 + 4)], fill=(255, 0, 0))
-        draw.rectangle([(w * iw + iw - 1, h * ih + ih // 2 - 1), (w * iw + iw - 8, h * ih + ih // 2 + 1)],
-                       fill=(255, 0, 0))
+        draw.polygon(
+            [
+                (w * iw + iw - 8, h * ih + ih // 2 - 4),
+                (w * iw + iw - 13, h * ih + ih // 2),
+                (w * iw + iw - 8, h * ih + ih // 2 + 4),
+            ],
+            fill=(255, 0, 0),
+        )
+        draw.rectangle(
+            [(w * iw + iw - 1, h * ih + ih // 2 - 1), (w * iw + iw - 8, h * ih + ih // 2 + 1)], fill=(255, 0, 0)
+        )
 
     def draw_transition_frame(frame_no):
         w = frame_no % width
@@ -78,13 +84,11 @@ def visualize_predictions(frame_sequence, one_hot_pred, one_hot_gt, many_hot_pre
 
         scene_len, ih, iw = scene.shape[:3]
 
-        grid_width = max([i for i in range(int(scene_len ** .5), 0, -1) if scene_len % i == 0])
+        grid_width = max([i for i in range(int(scene_len ** 0.5), 0, -1) if scene_len % i == 0])
         grid_height = scene_len // grid_width
 
         scene = scene.reshape([grid_height, grid_width] + list(scene.shape[1:]))
-        scene = np.concatenate(np.split(
-            np.concatenate(np.split(scene, grid_height), axis=2)[0], grid_width
-        ), axis=2)[0]
+        scene = np.concatenate(np.split(np.concatenate(np.split(scene, grid_height), axis=2)[0], grid_width), axis=2)[0]
 
         img = Image.fromarray(scene.astype(np.uint8))
         draw = ImageDraw.Draw(img)
@@ -96,12 +100,20 @@ def visualize_predictions(frame_sequence, one_hot_pred, one_hot_gt, many_hot_pre
                     draw.text((5 + w * iw, h * ih), "T", fill=(0, 255, 0))
 
                 draw.rectangle([(w * iw + iw - 1, h * ih), (w * iw + iw - 6, h * ih + ih - 1)], fill=(0, 0, 0))
-                draw.rectangle([(w * iw + iw - 4, h * ih),
-                                (w * iw + iw - 5, h * ih + (ih - 1) * scene_one_hot_pred[j])], fill=(0, 255, 0))
-                draw.rectangle([(w * iw + iw - 2, h * ih),
-                                (w * iw + iw - 3, h * ih + (ih - 1) * (
-                                    scene_many_hot_pred[j] if scene_many_hot_pred is not None else 0
-                                ))], fill=(255, 255, 0))
+                draw.rectangle(
+                    [(w * iw + iw - 4, h * ih), (w * iw + iw - 5, h * ih + (ih - 1) * scene_one_hot_pred[j])],
+                    fill=(0, 255, 0),
+                )
+                draw.rectangle(
+                    [
+                        (w * iw + iw - 2, h * ih),
+                        (
+                            w * iw + iw - 3,
+                            h * ih + (ih - 1) * (scene_many_hot_pred[j] if scene_many_hot_pred is not None else 0),
+                        ),
+                    ],
+                    fill=(255, 255, 0),
+                )
                 j += 1
 
         images.append(np.array(img))
@@ -117,9 +129,9 @@ def visualize_errors(frames, predictions, targets, fp_mistakes, fn_mistakes):
     for mistakes in [fp_mistakes, fn_mistakes]:
         for start, end in mistakes:
             idx = int(start + (end - start) // 2)
-            scene = frames[max(0, idx - 25):][:50]
-            scene_pred = predictions[max(0, idx - 25):][:50]
-            scene_tar = targets[max(0, idx - 25):][:50]
+            scene = frames[max(0, idx - 25) :][:50]
+            scene_pred = predictions[max(0, idx - 25) :][:50]
+            scene_tar = targets[max(0, idx - 25) :][:50]
 
             if len(scene) < 50:
                 continue
@@ -137,8 +149,6 @@ def visualize_errors(frames, predictions, targets, fp_mistakes, fn_mistakes):
             if tar == 1:
                 draw.text((w * iw + iw - 10, h * ih), "T", fill=(255, 0, 0))
 
-            draw.rectangle([(w * iw + iw - 1, h * ih), (w * iw + iw - 4, h * ih + ih - 1)],
-                           fill=(0, 0, 0))
-            draw.rectangle([(w * iw + iw - 2, h * ih),
-                            (w * iw + iw - 3, h * ih + (ih - 1) * pred)], fill=(0, 255, 0))
+            draw.rectangle([(w * iw + iw - 1, h * ih), (w * iw + iw - 4, h * ih + ih - 1)], fill=(0, 0, 0))
+            draw.rectangle([(w * iw + iw - 2, h * ih), (w * iw + iw - 3, h * ih + (ih - 1) * pred)], fill=(0, 255, 0))
     return img

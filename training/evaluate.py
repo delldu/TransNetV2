@@ -17,6 +17,7 @@ import input_processing
 import visualization_utils
 
 import logging
+
 logger = tf.get_logger()
 logger.setLevel(logging.ERROR)
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -30,7 +31,8 @@ def get_batches(frames):
 
     def func():
         for i in range(0, len(frames) - 50, 50):
-            yield frames[i:i+100]
+            yield frames[i : i + 100]
+
     return func()
 
 
@@ -50,7 +52,7 @@ if __name__ == "__main__":
     if options["original_transnet"]:
         net = models.OriginalTransNet()
         logit_fc = lambda x: tf.nn.softmax(x)[:, :, 1]
-        
+
     else:
         net = transnet.TransNetV2()
         logit_fc = tf.sigmoid
@@ -81,12 +83,14 @@ if __name__ == "__main__":
             one_hot = predict(batch)
             predictions.append(one_hot[25:75])
 
-        predictions = np.concatenate(predictions, 0)[:len(frames)]
+        predictions = np.concatenate(predictions, 0)[: len(frames)]
         gt_scenes = np.loadtxt(np_fn[:-3] + "txt", dtype=np.int32, ndmin=2)
 
         _, _, _, (tp, fp, fn), fp_mistakes, fn_mistakes = metrics_utils.evaluate_scenes(
-            gt_scenes, metrics_utils.predictions_to_scenes((predictions >= args.thr).astype(np.uint8)),
-            return_mistakes=True)
+            gt_scenes,
+            metrics_utils.predictions_to_scenes((predictions >= args.thr).astype(np.uint8)),
+            return_mistakes=True,
+        )
 
         total_stats["tp"] += tp
         total_stats["fp"] += fp
@@ -94,9 +98,12 @@ if __name__ == "__main__":
 
         if len(fp_mistakes) > 0 or len(fn_mistakes) > 0:
             img = visualization_utils.visualize_errors(
-                frames, predictions,
+                frames,
+                predictions,
                 create_dataset.scenes2zero_one_representation(gt_scenes, len(frames))[1],
-                fp_mistakes, fn_mistakes)
+                fp_mistakes,
+                fn_mistakes,
+            )
             if img is not None:
                 img.save(os.path.join(img_dir, os.path.basename(np_fn[:-3]) + "png"))
 
@@ -108,8 +115,10 @@ if __name__ == "__main__":
     p = total_stats["tp"] / (total_stats["tp"] + total_stats["fp"])
     r = total_stats["tp"] / (total_stats["tp"] + total_stats["fn"])
     f1 = (p * r * 2) / (p + r)
-    print(f"""
+    print(
+        f"""
     Precision:{p*100:5.2f}%
     Recall:   {r*100:5.2f}%
     F1 Score: {f1*100:5.2f}%
-    """)
+    """
+    )
