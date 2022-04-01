@@ -75,14 +75,16 @@ def video_service(input_file, output_file, targ):
 
     print("Start decode video ...")
     decode_progress_bar = tqdm(total=video.n_frames)
+
     def reading_video_frames(no, data):
         decode_progress_bar.update(1)
         # print(f"frame: {no} -- {data.shape}"),
         # data -- np.frombuffer(buffer, np.uint8).reshape([self.height, self.width, 4])
         image = Image.fromarray(data).resize((DETECT_IMAGE_WIDTH, DETECT_IMAGE_HEIGHT)).convert("RGB")
-        tensor = torch.from_numpy(np.array(image)).unsqueeze(0) # 1x3x27x48, range [0, 255]
+        tensor = torch.from_numpy(np.array(image)).unsqueeze(0)  # 1x3x27x48, range [0, 255]
 
         frame_list.append(tensor)
+
     video.forward(callback=reading_video_frames)
     del decode_progress_bar
 
@@ -105,7 +107,7 @@ def video_service(input_file, output_file, targ):
         with torch.no_grad():
             single_frame_pred, all_frame_pred = model(input_tensor)
 
-        single_frame_pred = torch.sigmoid(single_frame_pred).cpu()
+        single_frame_pred = torch.sigmoid(single_frame_pred).cpu()  # [1, 100, 1]
         predict_list.append(single_frame_pred[:, 25:75, :])
 
     predict_list = predict_list[0 : len(frame_list)]
@@ -117,10 +119,10 @@ def video_service(input_file, output_file, targ):
     start = 0
     sbd_list = []
     for index in torch.where(prediction_tensor > 0.5)[1].tolist():
-        if index > start + 5:
+        if index > start + 5:  # One scene at least has 5 frames
             sbd_list.append((start, index))
             start = index + 1  # next
-    if start < len(frame_list) - 5:
+    if start < len(frame_list) - 5: # One scene at least has 5 frames 
         sbd_list.append((start, len(frame_list) - 1))
 
     with open(output_file, "w") as f:

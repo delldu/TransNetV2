@@ -25,19 +25,19 @@ class TransNetV2(nn.Module):
         )
 
         self.frame_sim_layer = FrameSimilarity(
-                sum([(F * 2 ** i) * 4 for i in range(L)]),
-                lookup_window=101,
-                output_dim=128,
-                similarity_dim=128,
-                use_bias=True,
-            )
+            sum([(F * 2 ** i) * 4 for i in range(L)]),
+            lookup_window=101,
+            output_dim=128,
+            similarity_dim=128,
+            use_bias=True,
+        )
         self.color_hist_layer = ColorHistograms(lookup_window=101, output_dim=128)
 
         self.dropout = nn.Dropout(dropout_rate) if dropout_rate is not None else None
 
         output_dim = ((F * 2 ** (L - 1)) * 4) * 3 * 6  # 3x6 for spatial dimensions
-        output_dim += 128 # use_frame_similarity
-        output_dim += 128 # use_color_histograms
+        output_dim += 128  # use_frame_similarity
+        output_dim += 128  # use_color_histograms
 
         self.fc1 = nn.Linear(output_dim, D)
         self.cls_layer1 = nn.Linear(D, 1)
@@ -110,7 +110,7 @@ class StackedDDCNNV2(nn.Module):
         x = inputs
 
         shortcut_init = False
-        shortcut = x # Set fake value for torch.jit.script
+        shortcut = x  # Set fake value for torch.jit.script
 
         for block in self.DDCNN:
             x = block(x)
@@ -241,12 +241,14 @@ class FrameSimilarity(nn.Module):
         similarities = similarities_padded[batch_indices, time_indices, lookup_indices]
         return F.relu(self.fc(similarities))
 
+
 # To support torch.jit.script, we move get_bin() from compute_color_histograms()
 def get_bin(frames):
     # returns 0 .. 511
     R, G, B = frames[:, :, 0], frames[:, :, 1], frames[:, :, 2]
     R, G, B = R >> 5, G >> 5, B >> 5
     return (R << 6) + (G << 3) + B
+
 
 class ColorHistograms(nn.Module):
     def __init__(self, lookup_window=101, output_dim=128):
