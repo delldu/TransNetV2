@@ -44,6 +44,7 @@ def get_model():
     model = model.to(device)
     model.eval()
 
+    print(f"Running on {device} ...")
     model = torch.jit.script(model)
 
     todos.data.mkdir("output")
@@ -104,8 +105,12 @@ def video_service(input_file, output_file, targ):
         detect_progress_bar.update(50)
         input_tensor = torch.cat(padded_list[index : index + 100], dim=0).to(device)
 
-        with torch.no_grad():
-            single_frame_pred, all_frame_pred = model(input_tensor)
+        torch.cuda.synchronize()
+        with torch.jit.optimized_execution(False):
+            with torch.no_grad():
+                # single_frame_pred, all_frame_pred = model(input_tensor)
+                single_frame_pred = model(input_tensor)
+        torch.cuda.synchronize()
 
         single_frame_pred = torch.sigmoid(single_frame_pred).cpu()  # [1, 100, 1]
         predict_list.append(single_frame_pred[:, 25:75, :])
@@ -122,7 +127,7 @@ def video_service(input_file, output_file, targ):
         if index > start + 5:  # One scene at least has 5 frames
             sbd_list.append((start, index))
             start = index + 1  # next
-    if start < len(frame_list) - 5: # One scene at least has 5 frames 
+    if start < len(frame_list) - 5:  # One scene at least has 5 frames
         sbd_list.append((start, len(frame_list) - 1))
 
     with open(output_file, "w") as f:

@@ -78,7 +78,8 @@ class TransNetV2(nn.Module):
 
         one_hot = self.cls_layer1(x)
 
-        return one_hot, {"many_hot": self.cls_layer2(x)}
+        # return one_hot, {"many_hot": self.cls_layer2(x)}
+        return one_hot
 
 
 class StackedDDCNNV2(nn.Module):
