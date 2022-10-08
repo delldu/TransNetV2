@@ -1,10 +1,10 @@
-"""Image/Video Patch Package."""  # coding=utf-8
+"""Video Scene Package."""  # coding=utf-8
 #
 # /************************************************************************************
 # ***
-# ***    Copyright Dell 2021, 2022(18588220928@163.com) All Rights Reserved.
+# ***    Copyright Dell 2022(18588220928@163.com) All Rights Reserved.
 # ***
-# ***    File Author: Dell, 2021年 12月 14日 星期二 00:22:28 CST
+# ***    File Author: Dell, 2022年 10月 08日 星期六 21:25:27 CST
 # ***
 # ************************************************************************************/
 #
@@ -18,7 +18,6 @@ import torch
 import redos
 import todos
 
-import torchvision.transforms as T
 from PIL import Image
 import numpy as np
 
@@ -54,7 +53,7 @@ def get_model():
     return model, device
 
 
-def video_service(input_file, output_file, targ):
+def video_predict(input_file, output_file):
     # load video
     video = redos.video.Reader(input_file)
     # video = redos.video.Sequence(input_file)
@@ -65,8 +64,9 @@ def video_service(input_file, output_file, targ):
         return False
 
     # Create directory to store result
-    output_dir = output_file[0 : output_file.rfind(".")]
-    todos.data.mkdir(output_dir)
+    output_dir = output_file[0 : output_file.rfind("/")]
+    if output_dir != None and output_dir != "":
+        todos.data.mkdir(output_dir)
 
     # load model
     model, device = get_model()
@@ -81,6 +81,7 @@ def video_service(input_file, output_file, targ):
         decode_progress_bar.update(1)
         # print(f"frame: {no} -- {data.shape}"),
         # data -- np.frombuffer(buffer, np.uint8).reshape([self.height, self.width, 4])
+
         image = Image.fromarray(data).resize((DETECT_IMAGE_WIDTH, DETECT_IMAGE_HEIGHT)).convert("RGB")
         tensor = torch.from_numpy(np.array(image)).unsqueeze(0)  # 1x3x27x48, range [0, 255]
 
@@ -103,14 +104,10 @@ def video_service(input_file, output_file, targ):
     detect_progress_bar = tqdm(total=len(padded_list))
     for index in range(0, len(padded_list), 50):
         detect_progress_bar.update(50)
-        input_tensor = torch.cat(padded_list[index : index + 100], dim=0).to(device)
+        input_tensor = torch.cat(padded_list[index : index + 100], dim=0)
 
-        torch.cuda.synchronize()
-        with torch.jit.optimized_execution(False):
-            with torch.no_grad():
-                # single_frame_pred, all_frame_pred = model(input_tensor)
-                single_frame_pred = model(input_tensor)
-        torch.cuda.synchronize()
+        # single_frame_pred, all_frame_pred = model(input_tensor)
+        single_frame_pred = todos.model.forward(model, device, input_tensor)
 
         single_frame_pred = torch.sigmoid(single_frame_pred).cpu()  # [1, 100, 1]
         predict_list.append(single_frame_pred[:, 25:75, :])
@@ -134,20 +131,6 @@ def video_service(input_file, output_file, targ):
         for (s, e) in sbd_list:
             f.write(f"{s} {e}\n")
 
+    todos.model.reset_device()
+
     return True
-
-
-def video_client(name, input_file, output_file):
-    cmd = redos.video.Command()
-    context = cmd.scene(input_file, output_file)
-    redo = redos.Redos(name)
-    redo.set_queue_task(context)
-    print(f"Created 1 video tasks for {name}.")
-
-
-def video_server(name, host="localhost", port=6379):
-    return redos.video.service(name, "video_scene", video_service, host, port)
-
-
-def video_predict(input_file, output_file):
-    return video_service(input_file, output_file, None)
